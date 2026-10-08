@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dj-cratedigger"
+version = "0.1.0"
+description = "Paste a Spotify playlist link, get a folder of tagged audio files for your DJ sets."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "yt-dlp[default]>=2026.1.1",
+    "mutagen>=1.47",
+    "imageio-ffmpeg>=0.5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+cratedigger = "cratedigger.cli:main"
+
+[tool.setuptools]
+packages = ["cratedigger"]
