@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "playdown"
-version = "0.2.0"
+version = "0.2.1"
 description = "Paste a Spotify playlist link, get a folder of tagged audio files for your DJ sets."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -44,8 +44,12 @@ jobs:
         run: |
           curl -fsSL -o deno.zip "https://github.com/denoland/deno/releases/download/${DENO_VERSION}/${{ matrix.deno }}"
           unzip -q -o deno.zip -d deno-bin
-          exe="deno"; [ "$RUNNER_OS" = "Windows" ] && exe="deno.exe"
-          echo "DENO_BIN=$PWD/deno-bin/$exe" >> "$GITHUB_ENV"
+          dir="$PWD/deno-bin"; exe="deno"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # Git Bash paths look like /d/a/...; Python on Windows needs D:/a/...
+            dir="$(cygpath -m "$dir")"; exe="deno.exe"
+          fi
+          echo "DENO_BIN=$dir/$exe" >> "$GITHUB_ENV"
 
       - name: Build
         run: pyinstaller --noconfirm packaging/PlayDown.spec

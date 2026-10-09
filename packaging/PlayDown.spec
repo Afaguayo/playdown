@@ -41,7 +41,7 @@ if sys.platform == "darwin":
         name="PlayDown.app",
         icon=os.path.join(ASSETS, "icon.png"),
         bundle_identifier="com.afaguayo.playdown",
-        info_plist={"NSHighResolutionCapable": True, "CFBundleShortVersionString": "0.2.0"},
+        info_plist={"NSHighResolutionCapable": True, "CFBundleShortVersionString": "0.2.1"},
     )
 else:
     # One self-contained .exe on Windows
