@@ -6,3 +6,6 @@ build/
 dist/
 crates/
 .env
+selftest.txt
+*.spec.bak
+.DS_Store

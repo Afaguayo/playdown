@@ -1,12 +1,14 @@
-# 🎧 DJ CrateDigger
+# 🎧 PlayDown
 
 **Paste a Spotify playlist link → get a folder of tagged audio files ready to drop into Rekordbox, Serato, Traktor or VirtualDJ.**
+
+![PlayDown: a Y2K-style desktop app with brushed metal, glossy buttons and a green LCD](docs/screenshot.png)
 
 ## Why I built this
 
 I was tired of finding songs one by one when I already had the playlists built on Spotify. Every time I prepped a set I'd go through a playlist I'd spent weeks curating, search for each track by hand, download it, rename it, fix the tags… for 40+ songs. The playlist already existed, so the computer should do the digging.
 
-DJ CrateDigger reads the playlist, finds each song online, picks the version that best matches the original (same artist, same title, same length; no live versions, covers, sped-up edits or lyric-video rips), and saves it as a clean, tagged file named `Artist - Title.mp3`.
+PlayDown reads the playlist, finds each song online, picks the version that best matches the original (same artist, same title, same length; no live versions, covers, sped-up edits or lyric-video rips), and saves it as a clean, tagged file named `Artist - Title.mp3`.
 
 ## Features
 
@@ -19,19 +21,44 @@ DJ CrateDigger reads the playlist, finds each song online, picks the version tha
 - 📝 Anything it couldn't find confidently goes to `_not_found.txt`, so you only dig for those manually
 - ⚡ Parallel downloads (`-j`)
 - 🔑 No Spotify account or API keys needed (optional keys unlock playlists longer than 100 tracks)
+- 💿 A **desktop app** in early-2000s style (brushed metal, gel buttons, chrome logo, green LCD, spinning record) plus a CLI
 
-## Install
+## Download the app (no Python needed)
+
+Grab the latest build from [**Releases**](https://github.com/Afaguayo/playdown/releases/latest):
+
+| Platform | File |
+|---|---|
+| Windows 10/11 | `PlayDown-windows.exe`: double-click to run, nothing to install |
+| macOS (Apple Silicon) | `PlayDown-macos.zip`: unzip, then right-click `PlayDown.app` → **Open** the first time |
+
+Everything it needs (ffmpeg and the JavaScript runtime YouTube requires) is bundled inside. The app isn't code-signed, so Windows SmartScreen will warn you the first time. Click **More info → Run anyway**.
+
+### Using the app
+
+1. Copy a playlist link in Spotify (**Share → Copy link to playlist**) and hit **PASTE**.
+2. Pick a format (**MP3** / **M4A** / **FLAC** / **WAV**), where crates go (**BROWSE**), and how many tracks to grab at once (**SPEED**).
+3. Optional: light up **PREVIEW ONLY** to see what each track will match to without downloading.
+4. Hit **DIG IT!** and watch the LCD. **STOP** finishes the tracks in progress and stops. Running it again picks up where you left off.
+5. **OPEN CRATE** opens the folder. Import the `.m3u8` into your DJ software.
+
+The app remembers your settings between runs.
+
+## Install from source (CLI + app)
 
 You need **Python 3.10+** and a JavaScript runtime (**Node.js** or **Deno**). yt-dlp uses the JS runtime to deal with YouTube's player.
 
 ```bash
-git clone https://github.com/Afaguayo/dj-cratedigger.git
-cd dj-cratedigger
+git clone https://github.com/Afaguayo/playdown.git
+cd playdown
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
+
+playdown-gui          # the desktop app
+playdown --help       # the command-line version
 ```
 
-You don't need to install `ffmpeg`: if it isn't on your system, CrateDigger uses the copy bundled with `imageio-ffmpeg`.
+You don't need to install `ffmpeg`: if it isn't on your system, PlayDown uses the copy bundled with `imageio-ffmpeg`.
 
 > Stuck on an older Python (macOS ships 3.9)? Install [uv](https://docs.astral.sh/uv/) and run `uv venv --python 3.12 .venv && uv pip install -e .`
 
@@ -39,13 +66,13 @@ You don't need to install `ffmpeg`: if it isn't on your system, CrateDigger uses
 
 ```bash
 # Dig a whole playlist into ./crates/<Playlist Name>/
-cratedigger "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+playdown "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
 
 # Preview which video each track will match to without downloading anything
-cratedigger "<playlist link>" --dry-run
+playdown "<playlist link>" --dry-run
 
 # Choose format, output folder and parallelism
-cratedigger "<playlist link>" -f m4a -o ~/Music/DJ -j 5
+playdown "<playlist link>" -f m4a -o ~/Music/DJ -j 5
 ```
 
 Output:
@@ -70,7 +97,7 @@ crates/
 
 ### Playlists longer than 100 tracks
 
-Without keys, CrateDigger reads Spotify's public embed page, which only lists the first 100 tracks. For longer playlists, create a free app at the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and export its credentials:
+Without keys, PlayDown reads Spotify's public embed page, which only lists the first 100 tracks. For longer playlists, create a free app at the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and export its credentials:
 
 ```bash
 export SPOTIFY_CLIENT_ID=your_id
@@ -107,19 +134,40 @@ This tool is for personal use. Only download music you have the right to use, an
 ```bash
 pip install -e '.[dev]'
 pytest
+playdown-gui --selftest report.txt   # checks ffmpeg, JS runtime, GUI, Spotify + YouTube
+```
+
+### Building the .exe / .app
+
+Pushing a `v*` tag runs [`.github/workflows/build.yml`](.github/workflows/build.yml). It builds `PlayDown.exe` on Windows and `PlayDown.app` on macOS with PyInstaller, bundles Deno, runs the self-test **on the built app**, and attaches both to the GitHub release.
+
+```bash
+git tag v0.2.1 && git push origin v0.2.1
+```
+
+To build locally (a Windows .exe has to be built on Windows):
+
+```bash
+pip install -e '.[dev]'
+DENO_BIN=/path/to/deno pyinstaller --noconfirm packaging/PlayDown.spec   # → dist/
 ```
 
 Project layout:
 
 ```
-cratedigger/
+playdown/
 ├── spotify.py     # link parsing + track list (Web API or embed page)
 ├── matcher.py     # scoring YouTube candidates against the Spotify track
-├── downloader.py  # yt-dlp search/download, ffmpeg, tagging
-└── cli.py         # argument parsing, parallel runs, .m3u8 + report
+├── downloader.py  # yt-dlp search/download, ffmpeg + JS runtime discovery, tagging
+├── engine.py      # the dig: parallel runs, events, .m3u8 + report (shared by CLI and app)
+├── cli.py         # command-line front end
+├── gui.py         # the desktop app (Tk canvas, worker thread, self-test)
+├── skin.py        # the Y2K look: chrome type, gel buttons, LCD, LEDs, vinyl, all drawn with Pillow
+└── assets/        # icon + fonts (Orbitron, VT323, both SIL Open Font License)
+packaging/         # PyInstaller spec + entry point
 ```
 
-Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp), [mutagen](https://github.com/quodlibet/mutagen) and [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg).
+Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp), [mutagen](https://github.com/quodlibet/mutagen), [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg), [Pillow](https://python-pillow.org) and [Deno](https://deno.com). Fonts: [Orbitron](https://fonts.google.com/specimen/Orbitron) and [VT323](https://fonts.google.com/specimen/VT323) (SIL OFL 1.1).
 
 ## License
 

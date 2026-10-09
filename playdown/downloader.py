@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import sys
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -12,14 +13,20 @@ from .matcher import Candidate, best_match
 from .spotify import Track
 
 FORMATS = {"mp3", "m4a", "flac", "wav"}
-CACHE_BIN = Path.home() / ".cache" / "dj-cratedigger" / "bin"
+
+
+def bundle_dir() -> Optional[Path]:
+    """Folder holding binaries shipped inside the packaged app (PyInstaller), if any."""
+    base = getattr(sys, "_MEIPASS", None)
+    return Path(base) if base else None
 
 
 def find_ffmpeg() -> str:
-    """Return a directory containing an `ffmpeg` binary.
+    """Return the path of an ffmpeg executable (or a folder containing one).
 
-    Uses the system ffmpeg if there is one, otherwise the copy bundled by the
-    imageio-ffmpeg package (symlinked as `ffmpeg` so yt-dlp can find it).
+    Prefers the system ffmpeg, then the copy bundled by the imageio-ffmpeg
+    package. yt-dlp accepts the binary path directly, even with a versioned
+    name like ffmpeg-win-x86_64-v7.1.exe.
     """
     system = shutil.which("ffmpeg")
     if system:
@@ -27,15 +34,24 @@ def find_ffmpeg() -> str:
     try:
         import imageio_ffmpeg
     except ImportError:
-        raise SystemExit("ffmpeg not found. Install it (brew install ffmpeg) or `pip install imageio-ffmpeg`.")
-    exe = Path(imageio_ffmpeg.get_ffmpeg_exe())
-    CACHE_BIN.mkdir(parents=True, exist_ok=True)
-    link = CACHE_BIN / "ffmpeg"
-    if not link.exists() or link.resolve() != exe.resolve():
-        if link.is_symlink() or link.exists():
-            link.unlink()
-        link.symlink_to(exe)
-    return str(CACHE_BIN)
+        raise RuntimeError("ffmpeg not found. Install it (brew install ffmpeg) or `pip install imageio-ffmpeg`.")
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def find_js_runtime() -> Optional[dict]:
+    """yt-dlp `js_runtimes` config. YouTube needs a JS runtime to solve its player challenges.
+
+    Order: deno bundled in the app → deno on PATH → node on PATH.
+    """
+    exe = "deno.exe" if os.name == "nt" else "deno"
+    bundled = bundle_dir() / exe if bundle_dir() else None
+    if bundled and bundled.exists():
+        return {"deno": {"path": str(bundled)}}
+    if shutil.which("deno"):
+        return {"deno": {}}
+    if shutil.which("node"):
+        return {"node": {}}
+    return None
 
 
 def safe_filename(name: str) -> str:
@@ -56,7 +72,8 @@ class Downloader:
         self.fmt = fmt
         self.search_results = search_results
         self.quiet = quiet
-        self.ffmpeg_dir = find_ffmpeg()
+        self.ffmpeg = find_ffmpeg()
+        self.js_runtimes = find_js_runtime()
 
     def _ydl(self, extra: Optional[dict] = None):
         import yt_dlp
@@ -65,12 +82,10 @@ class Downloader:
             "quiet": self.quiet,
             "no_warnings": self.quiet,
             "noprogress": True,
-            "ffmpeg_location": self.ffmpeg_dir,
+            "ffmpeg_location": self.ffmpeg,
         }
-        # YouTube needs a JS runtime to solve its player challenges. yt-dlp looks
-        # for deno by default; fall back to node, which more people already have.
-        if not shutil.which("deno") and shutil.which("node"):
-            opts["js_runtimes"] = {"node": {}}
+        if self.js_runtimes:
+            opts["js_runtimes"] = self.js_runtimes
         opts.update(extra or {})
         return yt_dlp.YoutubeDL(opts)
 

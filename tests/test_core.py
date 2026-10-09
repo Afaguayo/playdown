@@ -1,8 +1,8 @@
 import pytest
 
-from cratedigger.downloader import safe_filename, track_filename
-from cratedigger.matcher import Candidate, best_match, normalize, score
-from cratedigger.spotify import Track, parse_link
+from playdown.downloader import safe_filename, track_filename
+from playdown.matcher import Candidate, best_match, normalize, score
+from playdown.spotify import Track, parse_link
 
 
 @pytest.mark.parametrize(

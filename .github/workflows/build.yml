@@ -1,0 +1,89 @@
+name: Build apps
+
+# Builds PlayDown.exe (Windows) and PlayDown.app (macOS), self-tests the built
+# app, and attaches both to a GitHub release when a v* tag is pushed.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DENO_VERSION: v2.9.7
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            deno: deno-x86_64-pc-windows-msvc.zip
+            asset: PlayDown-windows.exe
+          - os: macos-latest
+            deno: deno-aarch64-apple-darwin.zip
+            asset: PlayDown-macos.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install ".[dev]"
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: Fetch Deno (JS runtime yt-dlp needs for YouTube)
+        shell: bash
+        run: |
+          curl -fsSL -o deno.zip "https://github.com/denoland/deno/releases/download/${DENO_VERSION}/${{ matrix.deno }}"
+          unzip -q -o deno.zip -d deno-bin
+          exe="deno"; [ "$RUNNER_OS" = "Windows" ] && exe="deno.exe"
+          echo "DENO_BIN=$PWD/deno-bin/$exe" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: pyinstaller --noconfirm packaging/PlayDown.spec
+
+      - name: Self-test built app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\PlayDown.exe -ArgumentList '--selftest',"$PWD\selftest.txt" -Wait -PassThru
+          Get-Content selftest.txt
+          exit $p.ExitCode
+
+      - name: Self-test built app (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set +e
+          dist/PlayDown.app/Contents/MacOS/PlayDown --selftest "$PWD/selftest.txt"
+          code=$?
+          cat selftest.txt
+          exit $code
+
+      - name: Package
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp dist/PlayDown.exe "${{ matrix.asset }}"
+          else
+            (cd dist && ditto -c -k --keepParent PlayDown.app "../${{ matrix.asset }}")
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}
+          generate_release_notes: true
